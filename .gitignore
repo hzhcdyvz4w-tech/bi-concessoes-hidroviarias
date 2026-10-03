@@ -1,0 +1,18 @@
+# Segredos e configuração local
+.env
+.env.*
+server/config.json
+*.pem
+*.key
+
+# Logs e arquivos temporários
+logs/
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+
+# Dados internos reais não devem ser versionados
+private/dados_internos.local.json
+private/importacoes/
+private/anexos/
