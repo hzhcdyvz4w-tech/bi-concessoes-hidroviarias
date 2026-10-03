@@ -1,0 +1,12 @@
+{
+  "app": {"name":"BI Executivo de Concessões Hidroviárias","version":"8.0"},
+  "security": {
+    "authentication_required_for_private": true,
+    "roles":["LEITOR","ANALISTA","GESTOR","ADMIN"],
+    "default_role":"LEITOR",
+    "session_cookie":{"http_only":true,"secure":true,"same_site":"Strict"},
+    "audit_log":true,
+    "public_private_data_separation":true
+  },
+  "paths":{"public":"../public","private":"../private","audit":"../logs/auditoria.log"}
+}
