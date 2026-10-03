@@ -18,3 +18,8 @@ private/dados_internos.local.json
 private/*.local.json
 private/importacoes/
 private/anexos/
+
+# Candidatos, snapshots e exportações locais
+candidatos.json
+snapshot_dados_*.json
+*.bak
