@@ -13,6 +13,8 @@ __pycache__/
 .DS_Store
 
 # Dados internos reais não devem ser versionados
+private/dados_internos.json
 private/dados_internos.local.json
+private/*.local.json
 private/importacoes/
 private/anexos/
