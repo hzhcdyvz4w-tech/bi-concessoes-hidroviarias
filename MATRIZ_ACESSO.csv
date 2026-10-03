@@ -1,0 +1,5 @@
+Perfil;Camada pública;Camada privada;Editar dados;Validar publicação;Administrar usuários
+LEITOR;Sim;Sim;Não;Não;Não
+ANALISTA;Sim;Sim;Sim;Não;Não
+GESTOR;Sim;Sim;Sim;Sim;Não
+ADMIN;Sim;Sim;Sim;Sim;Sim
