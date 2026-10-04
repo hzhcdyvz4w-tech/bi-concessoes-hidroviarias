@@ -34,7 +34,7 @@ footer{text-align:center;color:#708597;font-size:11px;padding:18px}
     <button onclick="openView('carteira')"><span class="ico">🧭</span><b>Carteira de Concessões</b><small>Região, hidrovia, fase e responsável</small></button>
     <button onclick="openView('briefing')"><span class="ico">📄</span><b>Briefing Executivo</b><small>Síntese para decisão</small></button>
     <button onclick="openView('relatorio')"><span class="ico">📊</span><b>Relatório Executivo</b><small>Marcha, valores e próximos passos</small></button>
-    <button onclick="openView('sei')"><span class="ico">🗂️</span><b>Processos SEI</b><small>Acolher ZIP e extrair dados do processo</small></button>
+    <button onclick="openView('sei')"><span class="ico">🗂️</span><b>Processos SEI</b><small>Acolher ZIP, extrair dados e vincular à concessão</small></button>
     <button onclick="openView('consultas')"><span class="ico">👥</span><b>Consultas e Comunidades</b><small>Participação social e evidências</small></button>
     <button onclick="openView('decisoes')"><span class="ico">🎯</span><b>Decisões</b><small>Quem está com a bola e próximo marco</small></button>
     <button onclick="openView('marcha')"><span class="ico">🧩</span><b>Marcha Processual</b><small>Fases passadas, atual e seguinte</small></button>
@@ -47,7 +47,9 @@ footer{text-align:center;color:#708597;font-size:11px;padding:18px}
 <div class="kpis"><div class="kpi"><b id="procCount">0</b>processos</div><div class="kpi"><b id="zipCount">0</b>ZIPs</div><div class="kpi"><b id="docCount">0</b>documentos</div></div>
 <input type="search" id="search" placeholder="Buscar processo, documento, tipo ou conteúdo indexado">
 <div><button class="secondary" id="exportBtn">Exportar base SEI (JSON)</button> <button class="secondary" id="restoreBtn">Restaurar base</button><input id="jsonInput" type="file" accept=".json,application/json" hidden></div>
-<div id="processList" class="empty">Nenhum processo SEI importado neste navegador.</div></section>
+<div id="processList" class="empty">Nenhum processo SEI importado neste navegador.</div>
+<div class="card"><b>Integração com a concessão</b><p>Após a importação, o BI cruza automaticamente termos do processo com o nome da concessão, hidrovia e dados da carteira pública. Vínculos automáticos são apenas sugestões gerenciais e devem ser validados antes do assessoramento.</p></div>
+</section>
 <section id="carteira"><button class="back" onclick="home()">← Navegação Executiva</button><h2>🧭 Carteira de Concessões</h2><div id="portfolio"></div></section>
 <section id="briefing"><button class="back" onclick="home()">← Navegação Executiva</button><h2>📄 Briefing Executivo</h2><p class="sub">Visão sintética da carteira. A camada SEI local complementará a análise quando houver processos importados.</p><div id="brief"></div></section>
 <section id="relatorio"><button class="back" onclick="home()">← Navegação Executiva</button><h2>📊 Relatório Executivo</h2><p class="sub">Fase, avanço, responsável e próximo passo por projeto.</p><div id="report"></div></section>
@@ -73,6 +75,24 @@ async function put(s,v){let d=await db();return new Promise((res,rej)=>{let t=d.
 function norm(s){return String(s||'').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()}
 function ext(n){let m=String(n).toLowerCase().match(/\.([a-z0-9]+)$/);return m?m[1]:''}
 function nums(t){let o=[],m,re=/\b\d{5}\.\d{6}\/\d{4}-\d{2}\b/g;while((m=re.exec(String(t||''))))o.push(m[0]);return [...new Set(o)]}
+
+function projectLink(p){
+  if(!PROJECTS.length)return null;
+  let hay=norm([p.numero,p.searchText,(p.documents||[]).map(d=>d.name+' '+d.snippet).join(' ')].join(' ')).toLowerCase();
+  let scored=PROJECTS.map(x=>{
+    let terms=norm([x.nome,x.hidrovia,x.regiao].filter(Boolean).join(' ')).toLowerCase().split(/[^a-zà-ÿ0-9]+/).filter(w=>w.length>=5);
+    let hits=[...new Set(terms)].filter(w=>hay.includes(w)).length;
+    return{x,hits};
+  }).sort((a,b)=>b.hits-a.hits);
+  return scored[0]&&scored[0].hits>=1?scored[0]:null;
+}
+function extractIndicators(p){
+ let t=norm([p.searchText,(p.documents||[]).map(d=>d.name+' '+d.snippet).join(' ')].join(' '));
+ let phase=(t.match(/(?:fase|etapa|situa[cç][aã]o)[^.;\n]{0,100}/i)||[])[0]||null;
+ let value=(t.match(/R\$\s*[\d.]+(?:,\d{2})?/i)||[])[0]||null;
+ let next=(t.match(/(?:pr[oó]ximo\s+(?:passo|marco)|provid[eê]ncia|encaminhamento)[^.;\n]{0,130}/i)||[])[0]||null;
+ return{phase,value,next};
+}
 function dtype(n,t){let s=(n+' '+String(t).slice(0,3000)).toUpperCase(),rules=[['NOTA TÉCNICA',/NOTA\s*T[ÉE]CNICA/],['DESPACHO',/DESPACHO/],['OFÍCIO',/OF[IÍ]CIO/],['PARECER',/PARECER/],['CONTRATO',/CONTRATO/],['TERMO',/TERMO/],['RELATÓRIO',/RELAT[ÓO]RIO/],['EDITAL',/EDITAL/],['LICITAÇÃO',/LICITA[CÇ][AÃ]O|PREG[AÃ]O|CONCORR/],['PORTARIA',/PORTARIA/],['ACÓRDÃO',/AC[ÓO]RD[AÃ]O/]];for(let r of rules)if(r[1].test(s))return r[0];return ext(n).toUpperCase()||'ARQUIVO'}
 async function hash(b){let h=await crypto.subtle.digest('SHA-256',b);return [...new Uint8Array(h)].map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function importZip(file){if(typeof JSZip==='undefined')throw Error('Leitor ZIP não carregado.');let buf=await file.arrayBuffer(),h=await hash(buf);if(await get(SI,h))return{skip:1,docs:0};let z=await JSZip.loadAsync(buf),names=Object.keys(z.files).filter(n=>!z.files[n].dir),by={},archiveProc=nums(file.name),budget=0;
@@ -80,7 +100,7 @@ for(let n of names){let f=z.files[n],e=ext(n),txt='';if(TEXT.has(e)&&budget<12*1
 let now=new Date().toISOString();for(let id of Object.keys(by)){let b=by[id],cur=await get(SP,id)||{id,numero:b.numero,archives:[],documents:[],searchText:'',createdAt:now};if(!cur.archives.some(a=>a.hash===h))cur.archives.push({hash:h,name:file.name,importedAt:now});let known=new Set(cur.documents.map(d=>d.key));b.docs.forEach(d=>{if(!known.has(d.key)){cur.documents.push(d);known.add(d.key)}});cur.searchText=(cur.searchText+' '+b.text.join(' ')).slice(-250000);cur.lastImportAt=now;await put(SP,cur)}await put(SI,{hash:h,name:file.name,importedAt:now,processIds:Object.keys(by)});return{skip:0,docs:names.length}}
 async function importFiles(fs){let files=[...fs].filter(f=>/\.zip$/i.test(f.name)||f.type==='application/zip');if(!files.length)return setStatus('Selecione ao menos um ZIP.',1);setStatus('Processando '+files.length+' pacote(s)…');let n=0,s=0,d=0;try{for(let f of files){let r=await importZip(f);r.skip?s++:n++;d+=r.docs}setStatus('Concluído: '+n+' novo(s), '+s+' já existente(s), '+d+' documento(s) lido(s).');renderSei()}catch(e){setStatus('Falha: '+e.message,1)}}
 function setStatus(t,err){let e=document.getElementById('status');e.textContent=t;e.style.background=err?'#fff0f0':'#f5f8fa';e.style.color=err?'#8a2e2e':'#38546a'}
-async function renderSei(){let ps=await all(SP),zs=await all(SI),term=(document.getElementById('search').value||'').toLowerCase(),docs=ps.reduce((a,p)=>a+(p.documents||[]).length,0);procCount.textContent=ps.length;zipCount.textContent=zs.length;docCount.textContent=docs;let vis=ps.filter(p=>!term||[p.numero,p.searchText,(p.documents||[]).map(d=>d.name+' '+d.type+' '+d.snippet).join(' ')].join(' ').toLowerCase().includes(term));processList.className=vis.length?'':'empty';processList.innerHTML=vis.length?vis.map(p=>'<div class="proc"><strong>'+esc(p.numero)+'</strong><br>'+(p.archives||[]).map(a=>'<span class="chip">'+esc(a.name)+'</span>').join('')+'<ul class="docs">'+(p.documents||[]).map(d=>'<li><b>'+esc(d.type)+'</b> · '+esc(d.name)+(d.indexed?' · texto indexado':'')+'</li>').join('')+'</ul></div>').join(''):'Nenhum processo SEI importado neste navegador.'}
+async function renderSei(){let ps=await all(SP),zs=await all(SI),term=(document.getElementById('search').value||'').toLowerCase(),docs=ps.reduce((a,p)=>a+(p.documents||[]).length,0);procCount.textContent=ps.length;zipCount.textContent=zs.length;docCount.textContent=docs;let vis=ps.filter(p=>!term||[p.numero,p.searchText,(p.documents||[]).map(d=>d.name+' '+d.type+' '+d.snippet).join(' ')].join(' ').toLowerCase().includes(term));processList.className=vis.length?'':'empty';processList.innerHTML=vis.length?vis.map(p=>{let l=projectLink(p),i=extractIndicators(p);return '<div class="proc"><strong>'+esc(p.numero)+'</strong><br>'+(l?'<span class="chip">VÍNCULO SUGERIDO: '+esc(l.x.nome)+'</span>':'<span class="chip">SEM VÍNCULO AUTOMÁTICO</span>')+(p.archives||[]).map(a=>'<span class="chip">'+esc(a.name)+'</span>').join('')+(i.phase||i.value||i.next?'<div class="status"><b>Extração preliminar:</b> '+esc([i.phase,i.value,i.next].filter(Boolean).join(' • '))+'</div>':'')+'<ul class="docs">'+(p.documents||[]).map(d=>'<li><b>'+esc(d.type)+'</b> · '+esc(d.name)+(d.indexed?' · texto indexado':'')+'</li>').join('')+'</ul></div>'}).join(''):'Nenhum processo SEI importado neste navegador.'}
 selectZip.onclick=e=>{e.stopPropagation();zipInput.click()};drop.onclick=e=>{if(e.target.id!=='selectZip')zipInput.click()};zipInput.onchange=()=>{importFiles(zipInput.files);zipInput.value=''};search.oninput=renderSei;
 exportBtn.onclick=async()=>{let p={schemaVersion:1,exportedAt:new Date().toISOString(),source:'BI Executivo de Concessões Hidroviárias — SEI local',processes:await all(SP),imports:await all(SI)},b=new Blob([JSON.stringify(p,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='BI_Concessoes_Processos_SEI_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),300)};
 restoreBtn.onclick=()=>jsonInput.click();jsonInput.onchange=async()=>{try{let p=JSON.parse(await jsonInput.files[0].text());for(let x of p.processes||[])await put(SP,x);for(let x of p.imports||[])await put(SI,x);setStatus('Base restaurada.');renderSei()}catch(e){setStatus('Falha ao restaurar: '+e.message,1)}jsonInput.value=''};
